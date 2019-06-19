@@ -1,0 +1,36 @@
+version: 2
+jobs:
+  build:
+    docker:
+      # Node image
+      - image: circleci/node:10.15
+
+    steps:
+      - checkout
+
+      # Download and cache Node dependencies
+      - restore_cache:
+          keys:
+            - node-v1-{{ checksum "yarn.lock" }}
+            - node-v1-
+
+      - run:
+          name: Install Node dependencies
+          command: yarn install
+
+      - save_cache:
+          key: node-v1-{{ checksum "yarn.lock" }}
+          paths:
+            - node_modules
+
+      - run:
+          name: Lint
+          command: yarn lint
+
+      - run:
+          name: Dependencies auditing
+          command: yarn audit
+
+      - run:
+          name: Build
+          command: yarn build
