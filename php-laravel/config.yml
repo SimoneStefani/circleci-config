@@ -1,0 +1,66 @@
+version: 2
+jobs:
+  build:
+    docker:
+      # PHP image
+      - image: circleci/php:7.3-stretch-node-browsers
+
+      # DB image
+      - image: circleci/postgres:9.6
+        environment:
+          POSTGRES_USER: root
+          POSTGRES_DB: test_database
+
+    steps:
+      - checkout
+
+      - run:
+          name: Install OS packages and extensions
+          command: |
+            sudo apt update && sudo apt install zlib1g-dev libpq-dev
+            sudo docker-php-ext-install zip pdo_pgsql bcmath
+
+      # Download and cache PHP dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "composer.lock" }}
+            - v1-dependencies-
+
+      - run:
+          name: Install PHP dependencies
+          command: composer install -n --prefer-dist
+
+      - save_cache:
+          key: composer-v1-{{ checksum "composer.lock" }}
+          paths:
+            - vendor
+
+      # Download and cache Node dependencies
+      - restore_cache:
+          keys:
+            - node-v1-{{ checksum "package.lock" }}
+            - node-v1-
+
+      - run:
+          name: Install Node dependencies
+          command: yarn install
+
+      - save_cache:
+          key: node-v1-{{ checksum "package.lock" }}
+          paths:
+            - node_modules
+
+      - run:
+          name: Setup Laravel environment
+          command: |
+            cp .env.circleci.example .env
+            php artisan key:generate
+            touch ./storage/logs/laravel.log
+
+      - run:
+          name: Migrate database
+          command: php artisan migrate --force
+
+      - run:
+          name: Run tests
+          command: ./vendor/bin/phpunit
