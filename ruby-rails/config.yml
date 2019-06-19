@@ -1,0 +1,74 @@
+version: 2
+jobs:
+  build:
+    docker:
+      # Ruby image
+      - image: circleci/ruby:2.5.3
+        environment:
+          RAILS_ENV: circleci
+          RAILS_MASTER_KEY: $RAILS_MASTER_KEY
+
+      # DB image
+      - image: circleci/postgres:9.6
+        environment:
+          POSTGRES_DB: test_database_circleci
+
+    steps:
+      - checkout
+
+      # Download and cache Ruby dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "Gemfile.lock" }}
+            - v1-dependencies-
+
+      - run:
+          name: Install Ruby dependencies
+          command: bundle check || bundle install
+
+      - save_cache:
+          key: v1-dependencies-{{ checksum "Gemfile.lock" }}
+          paths:
+            - vendor/bundle
+
+      # Download and cache Node dependencies
+      - restore_cache:
+          keys:
+            - node-v1-{{ checksum "yarn.lock" }}
+            - node-v1-
+
+      - run:
+          name: Install Node dependencies
+          command: yarn install
+
+      - save_cache:
+          key: node-v1-{{ checksum "yarn.lock" }}
+          paths:
+            - node_modules
+
+      - run:
+          name: Wait for DB
+          command: dockerize -wait tcp://localhost:5432 -timeout 1m
+
+      - run:
+          name: Static analysis with Rubocop
+          command: rubocop
+
+      - run:
+          name: Security analysis with Brakeman
+          command: brakeman -o brakeman-output.json --no-progress --separate-models
+
+      - run:
+          name: Dependencies auditing
+          command: bundle audit check --update
+
+      - run:
+          name: Setup DB
+          command: bundle exec rake db:drop db:create db:migrate
+
+      - run:
+          name: Run RSpec tests
+          command: bundle exec rspec
+
+      - store_artifacts:
+          path: coverage

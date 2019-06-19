@@ -31,14 +31,14 @@ jobs:
           command: composer install -n --prefer-dist
 
       - save_cache:
-          key: composer-v1-{{ checksum "composer.lock" }}
+          key: v1-dependencies-{{ checksum "composer.lock" }}
           paths:
             - vendor
 
       # Download and cache Node dependencies
       - restore_cache:
           keys:
-            - node-v1-{{ checksum "package.lock" }}
+            - node-v1-{{ checksum "yarn.lock" }}
             - node-v1-
 
       - run:
@@ -46,7 +46,7 @@ jobs:
           command: yarn install
 
       - save_cache:
-          key: node-v1-{{ checksum "package.lock" }}
+          key: node-v1-{{ checksum "yarn.lock" }}
           paths:
             - node_modules
 
